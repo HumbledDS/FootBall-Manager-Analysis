@@ -1,0 +1,302 @@
+---
+title: "FootBall ManagerAnalytics"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: united
+    highlight: tango
+    code_folding: hide
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = TRUE,
+                      fig.align = "center",
+                      out.width = "100%",
+                      class.source="foldable")
+```
+
+Football Manager is a popular and highly realistic football management simulation video game series. Developed by Sports Interactive and published by Sega, Football Manager puts players in the role of a football manager, allowing them to take control of a football club and make decisions on various aspects of team management.  
+
+Football Manager is known for its depth and realism, providing an immersive experience for football enthusiasts. The game allows players to experience the challenges and rewards of managing a football club, testing their skills in areas such as player development, team building, and tactical acumen.  
+
+Data plays a crucial role in Football Manager as it forms the foundation for the game's realism and accuracy. The developers of Football Manager, Sports Interactive, gather and incorporate vast amounts of data to create a comprehensive and detailed footballing experience. We will analyze that data to showcase whats possible to do with it.  
+
+
+# Loading PACKAGES and Data
+Lets load the packages needed for our work.
+
+```{r packages, include=FALSE}
+# chargement de packages
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(leaps)
+library(corrplot)
+library(questionr)
+library(caret)
+library(readr)
+library(naniar)
+library(tidyverse) 
+library(magrittr)
+library(DataExplorer)
+library(maps)
+library(plotly)
+library(DT)
+library(tidytext)
+library(gridExtra)
+library(visdat)
+```
+
+Here we load the CSV File we got from Football Manager.  
+
+```{r}
+file_path <- "C:/Users/gueye/OneDrive/Bureau/FootBallAnalytics/Fifa23PlayersData.csv"
+
+#Chargement des données
+FMdata=read_csv(file_path)
+FMdata
+
+```
+
+  
+Football Manager 2023 Dataset : 
+The dataset covers the data of a total of 18,539 players in the official version and is displayed in 89 column variables.  
+
+
+# Data Manipulation
+
+```{r}
+dim(FMdata)
+plot_intro(FMdata)
+#plot_missing(FMdata)
+
+```
+
+The data doesn't contain any missing values. Which is really good.  
+
+## Create League Variable & Sampling
+
+
+```{r echo=FALSE}
+#unique(FMdata$`Club Name`)
+```
+
+There are 919 unique Clubs over the dataSet.
+Lets try to focus on the TOP 6 European Clubs for the rest of the study (around 120 clubs). For that we will create the 6 Leagues Variable.  
+
+The dataset doesn't give information on Leagues so we will create the top 6 leagues with their current teams as of 2022/2023.
+This will help us later to compare Clubs and Leagues with insightful visualizations. (You can view CODE)  
+
+
+```{r}
+bundesliga <- c(
+  "FC Bayern München","Borussia Dortmund","RB Leipzig", "1. FC Union Berlin", "Sport-Club Freiburg","Bayer 04 Leverkusen",
+  "Eintracht Frankfurt","VfL Wolfsburg", "1. FSV Mainz 05", "Borussia Mönchengladbach",  
+  "1. FC Köln","TSG Hoffenheim","SV Werder Bremen", "VfL Bochum 1848","FC Augsburg","VfB Stuttgart",
+  "FC Schalke 04","Hertha BSC"
+)
+
+premierLeague <- c(
+  "Arsenal", "Bournemouth", "Brighton & Hove Albion", "Brentford",
+  "Nottingham Forest", "Chelsea", "Crystal Palace", "Everton", "Fulham",
+  "Leeds United", "Leicester City", "Liverpool", "Manchester City",
+  "Manchester United", "Newcastle United", "Southampton", 
+  "Tottenham Hotspur", "Aston Villa", "West Ham United", "Wolverhampton Wanderers"
+  
+)
+
+laliga <- c(
+  "Athletic Club de Bilbao", "Atlético de Madrid", "Cádiz CF", "Real Betis Balompié","Real Madrid CF",
+  "RC Celta de Vigo", "Deportivo Alavés", "Elche CF", "RCD Espanyol de Barcelona", "FC Barcelona",
+  "Sevilla FC", "Granada CF", "Levante Unión Deportiva", "CA Osasuna", "Rayo Vallecano", 
+  "RCD Mallorca", "Real Sociedad", "Valencia CF", "Villarreal CF","Getafe CF"
+)
+
+seriea <- c(
+  "Atalanta","Bologna","AC Monza","Hellas Verona","Empoli",
+  "Fiorentina","Lecce","Spezia",  "Internacional","Juventus",
+  "Lazio","AC Milan","Napoli","US Salernitana 1919","Roma",
+  "U.C. Sampdoria","U.S. Sassuolo Calcio","US Cremonese",  "Torino F.C.","Udinese Calcio"
+  
+)
+
+superlig <- c(
+  "Adana Demirspor","Aytemiz Alanyaspor", "Antalyaspor","İstanbul Başakşehir FK","Gazişehir Gaziantep F.K.",
+  "Beşiktaş JK","Fenerbahçe SK", "Galatasaray SK","Fatih Karagümrük S.K.","Kasimpaşa SK",
+  "Yukatel Kayserispor","İttifak Holding Konyaspor","GZT Giresunspor","MKE Ankaragücü", "Demir Grup Sivasspor","Trabzonspor","Atakaş Hatayspor","Gazişehir Gaziantep F.K."
+)
+
+ligue1 <- c(
+  "AC Ajaccio","Angers SCO", "AJ Auxerre","Stade Brestois 29", "Clermont Foot 63", "Racing Club de Lens",
+  "LOSC Lille", "FC Lorient", "Olympique Lyonnais", "Olympique de Marseille", "AS Monaco",
+  "Paris Saint-Germain", "Montpellier Hérault SC", "FC Nantes", "OGC Nice", "Stade de Reims",
+  "Stade Rennais FC","RC Strasbourg Alsace", "Toulouse Football Club", "ESTAC Troyes"
+)
+
+
+
+
+FMdata %<>% mutate(
+    League = case_when(
+        `Club Name` %in% bundesliga ~ "Bundesliga",
+        `Club Name` %in% premierLeague ~ "Premier League",
+        `Club Name` %in% laliga ~ "La Liga",
+        `Club Name` %in% seriea ~ "Serie A",
+        `Club Name` %in% superlig ~ "Süper Lig",
+        `Club Name` %in% ligue1 ~ "Ligue 1"
+       
+    ),
+    Country = case_when(
+        League == "Bundesliga" ~ "Germany",
+        League == "Premier League" ~ "UK",
+        League == "La Liga" ~ "Spain",
+        League == "Serie A" ~ "Italy",
+        League == "Süper Lig" ~ "Turkey",
+        League == "Ligue 1" ~ "France"
+       
+    )
+) %>% filter(!is.na(League)) %>% mutate_if(is.factor, as.character)
+
+
+rm(bundesliga, premierLeague, laliga, seriea, superlig, ligue1)
+
+```
+
+
+
+Once that is done, lets Create a Column variable containing the Position of each player (Forward, Midfielder, Defenser).
+This will help us later analyze and compare players by Position in the playing field.  
+
+```{r }
+# Create a new variable "Position" and assign positions based on player names
+FMdata$PositionClass <- ifelse(grepl("[SW]", FMdata$`Positions Played`), "Forward",
+                          ifelse(grepl("[GK]", FMdata$`Positions Played`), "GoalKeeper",
+                               ifelse(grepl("[D]", FMdata$`Positions Played`) & !grepl("S", FMdata$`Positions Played`), "Defenser",
+                                 "Midfielder")))
+
+# Display the updated dataset with the "Position" variable
+#print(FMdata$PositionClass)
+
+
+```
+
+Now the dataset contains 1825 rows and 101variables.  
+
+# Data Analysis and Visualization 
+
+## League Analytics :
+
+### Market Values of The Leagues (Billions €)
+
+
+```{r}
+options(repr.plot.width = 16, repr.plot.height = 6)
+
+FMdata %>% 
+  group_by(League) %>% 
+  summarise(Total.Value = sum(as.integer(`Value(in Euro)`), na.rm = TRUE)) %>% 
+  ggplot(aes(reorder(League, Total.Value), Total.Value / 1e9, fill = Total.Value / 1e9)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, y = "Market Values of The Leagues (Billions €)") +
+  scale_fill_gradient(low = "salmon", high = "darkred") +
+  theme(
+    axis.line.y = element_line(colour = "660000"),
+    axis.ticks.x = element_line(colour = "660000")
+  ) +
+  scale_y_continuous(labels = scales::comma)
+
+
+```
+
+
+From this graph (chart), we can say that Premier League is the league that accumulates the most amount of value.  
+Next is La Liga. Bundesliga and Serie has quite the same amount of values in Billion Euros. These information may correlate with the salaries of players. We can try to see if High Platers Value equals to High Salary Base (mean). 
+  
+
+### Salary distribution in each League
+
+```{r}
+options(repr.plot.width = 16, repr.plot.height = 6)
+
+FMdata %>% 
+  group_by(League) %>% 
+  summarise(Total.Value = sum(as.integer(`Wage(in Euro)`)*52, na.rm = TRUE)) %>% 
+  ggplot(aes(reorder(League, Total.Value), Total.Value / 1e9, fill = Total.Value / 1e9)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  theme_minimal() +
+  labs(x = NULL, y = "Sum of Wages of The Leagues (Billions €) per year") +
+  scale_fill_gradient(low = "cyan", high = "blue") +
+  theme(
+    axis.line.y = element_line(colour = "660000"),
+    axis.ticks.x = element_line(colour = "660000")
+  ) +
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+### Distribution & The Average Age of The Players in each League
+
+This chart shows that in all leagues the average age of players is between 24-26 years old.  
+Super Lig is the League where players are older, and Ligue1-Bundesliga players are most likely younger.  
+We can also try to see quartiles in different leagues to see in what league majority of players are young or old (different to means).  
+   
+```{r}
+summ <- FMdata %>% 
+  group_by(League) %>% 
+  summarise(age = mean(Age))
+
+options(repr.plot.width = 12, repr.plot.height = 8)
+
+ggplot()+
+  geom_histogram(FMdata, mapping = aes(Age, fill = League))+
+  geom_vline(summ, mapping = aes(xintercept = age), color = "red", size = 1)+
+  geom_text(summ, mapping = aes(x = age+3, y = 65, label = round(age,digits = 2)))+
+  facet_wrap(League~.)+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  labs(y = "Frequency", title = "Distribution & The Average Age of The Players in each League", caption = "@EA Sports - FIFA 2021-2023")
+
+```
+
+
+### Fastest Forward in all leagues
+
+We will see the fastest players in each League per Position-Class.
+
+### Season 2023 Analytics (Winrate x Club) / League
+
+Lets analyze the top club winrates and compare the dominances/similarity in each League.
+Also we will analyse winning team statistics (Endurance, pace, offensive, defensive sets)
+
+
+```{r}
+
+```
+
+## Clubs and Country Analysis 
+### Country x Players
+
+We will try to see which country gives the most of players, and the highest quality of players. 
+
+
+
+
+# Conclusion
+
+
